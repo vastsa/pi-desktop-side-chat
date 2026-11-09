@@ -2,18 +2,18 @@
   "schemaVersion": 1,
   "id": "com.vastsa.side-chat",
   "name": "Side Chat",
-  "version": "0.1.0",
-  "description": "A docked sidebar chat that talks with your signed-in models, can attach the current session as context, and can send a reply back into that session.",
+  "version": "0.1.15",
+  "description": "A project-scoped sidebar chat that follows the current session and can return replies to the main input without sending.",
   "i18n": {
     "en": {
       "name": "Side Chat",
-      "description": "A docked sidebar chat that talks with your signed-in models, can attach the current session as context, and can send a reply back into that session.",
-      "safetyNotes": "Uses your already signed-in models through the host (agent.complete); the plugin never sees API keys. desktop.control lets it list sessions, read a transcript, and send a prompt into a session. Conversations are stored only in this plugin's local data directory. No network of its own."
+      "description": "A project-scoped sidebar chat that follows the current session and can return replies to the main input without sending.",
+      "safetyNotes": "Host-owned models keep API keys private. Attachments are copied from user-selected File contents into bounded plugin-private caches and sent to separate Plan-mode sessions. agent.extension limits those sessions to read tools; reload and explicit approval are required. Main-session access remains optional context reading and draft-only return."
     },
     "zh-CN": {
       "name": "侧边聊天",
-      "description": "停靠在右侧工作面板的独立聊天：走你已登录的模型，可把当前会话当上下文，也能把回复发回该会话。",
-      "safetyNotes": "通过宿主调用你已登录的模型（agent.complete），插件拿不到 API 密钥。desktop.control 用于列出会话、读取 transcript、向会话发送一条 prompt。对话只存在本插件本地数据目录，插件自身不联网。"
+      "description": "按项目保存历史的侧边聊天：自动跟随当前会话，可将回复放回主输入框，不自动发送。",
+      "safetyNotes": "通过宿主模型调用，不接触密钥。用户选择的附件内容保存在有上限的插件私有缓存，由独立 Plan 会话只读问答；agent.extension 限制该会话工具，需重载并明确授权。主会话仅可选读取上下文及主动回填草稿，不自动发送。"
     }
   },
   "author": "VastSa",
@@ -21,9 +21,12 @@
   "homepage": "https://github.com/vastsa/pi-desktop-side-chat",
   "repository": "https://github.com/vastsa/pi-desktop-side-chat",
   "main": "main.js",
+  "renderer": "renderer/draft-bridge.mjs",
+  "rendererActions": ["plugin.call", "composer.readDraft", "composer.insertText"],
+  "rendererCallMethods": ["takeDraft", "finishDraft"],
   "categories": ["productivity"],
-  "changelog": "Release 0.1.0: first release. Docked side chat with local history, host-owned completions, optional session context, and send-to-session.",
-  "safetyNotes": "Uses your already signed-in models through the host (agent.complete); the plugin never sees API keys. desktop.control lets it list sessions, read a transcript, and send a prompt into a session. Conversations are stored only in this plugin's local data directory. No network of its own.",
+  "changelog": "Release 0.1.15: hide inactive automatically empty history buckets and distinguish same-name nonempty project histories without merging, deleting or changing their keys. Preserve attachments, permissions and main/side isolation.",
+  "safetyNotes": "User-selected attachment bytes are stored in plugin-private per-conversation caches. Separate Plan sessions and an explicitly granted Agent extension restrict attachment Q&A to read tools. This is not an OS sandbox. No provider credentials, automatic main-session sending or main-composer attachment access.",
   "ui": {
     "panel": "renderer/index.html",
     "width": 420,
@@ -34,6 +37,7 @@
     }
   },
   "contributes": {
+    "agentExtensions": ["agent/attachment-guard-0.1.11.js"],
     "views": [
       {
         "id": "chat",
@@ -72,7 +76,9 @@
           { "label": "minimal", "value": "minimal" },
           { "label": "low", "value": "low" },
           { "label": "medium", "value": "medium" },
-          { "label": "high", "value": "high" }
+          { "label": "high", "value": "high" },
+          { "label": "xhigh", "value": "xhigh" },
+          { "label": "max", "value": "max" }
         ]
       },
       {
@@ -80,7 +86,7 @@
         "type": "boolean",
         "default": true,
         "title": "Attach session by default",
-        "description": "Include the selected session transcript when sending a side-chat message."
+        "description": "Include the automatically followed current session transcript in side-chat messages."
       }
     ]
   },
@@ -90,10 +96,13 @@
     "models.list",
     "agent.complete",
     "desktop.control",
-    "clipboard.write"
+    "clipboard.write",
+    "shell.openExternal",
+    "renderer.extension",
+    "agent.extension"
   ],
   "engines": {
-    "piDesktop": ">=0.14.0"
+    "piDesktop": ">=0.21.1-0"
   },
   "activationEvents": [
     "onStartup",
